@@ -1,64 +1,70 @@
-import torch
-import torch.nn as nn
-from torchvision import models
-import torch.nn.functional as F
-from torchvision.models import ResNet34_Weights
+#this code is based on BASNet for RFLNet: Reverse Feature Learning Network for Salient Object Detection in Forward-Looking Sonar Images
+# if you have any questions please contact with the author HFL,email ：HFL_CHN@163.com. wechat：H2363050138
+
+
+
+
+import torch   进口火炬   进口火炬
+import torch.nn as nn   进口火炬。Nn as Nn
+from torchvision import models从火炬视觉导入模型
+import torch.nn.functional as F进口火炬。n.功能为F
+from torchvision.models import ResNet34_Weights从torchvision。models导入ResNet34_Weights
 from model.resnet_model import *
-from torch.nn import functional
+from torch.nn import functional从火炬。Nn导入函数
 
 class channelmix(nn.Module):   #将中间输出的图片，经过rcl卷积，将mask进行输入，在进行bhs模型损失
-    def __init__(self,inchannel,outchannel,scale=4):
-        super(channelmix,self).__init__()
-        self.scale_channel = int(inchannel/scale)
+    def __init__(self,inchannel,outchannel,scale=4):def __init__(自我、inchannel outchannel、规模= 4):
+        super(channelmix,self).__init__()超级(channelmix自我). __init__ ()
+        self.scale_channel = int(inchannel/scale)自我。Scale_channel = int（inchannel/scale）
         #----------------------------------------上下channel公共卷积------------------------------------------------------#
-        self.conv3x3 = nn.Conv2d(in_channels=self.scale_channel,out_channels=self.scale_channel,kernel_size=3,stride=1,padding=1)
-        self.batchnorm = nn.BatchNorm2d(self.scale_channel)
-        self.relu = nn.ReLU(inplace=True)
+        self.conv3x3 = nn.Conv2d(in_channels=self.scale_channel,out_channels=self.scale_channel,kernel_size=3,stride=1,padding=1)自我。conv3x3 = nn.Conv2d（in_channels=self.scale_channel,out_channels=self.scale_channel,kernel_size=3,stride=1,padding=1）
+        self.batchnorm = nn.BatchNorm2d(self.scale_channel)自我。batchnorm = nn.BatchNorm2d（self.scale_channel）
+        self.relu = nn.ReLU(inplace=True)自我。relu = nn.ReLU(inplace=True)
 
         #------------------------上面channel卷积---------------------------------#
-        self.conv3x3_up_1 = nn.Conv2d(in_channels=inchannel,out_channels=outchannel,kernel_size=3,stride=1,padding=1)
-        self.batchnorm_up_1 = nn.BatchNorm2d(outchannel)
-        self.relu_up_1 = nn.ReLU(inplace=True)
-        self.conv3x3_up_2 = nn.Conv2d(in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1)
-        self.batchnorm_up_2 = nn.BatchNorm2d(outchannel)
-        self.relu_up_2 = nn.ReLU(inplace=True)
+        self.conv3x3_up_1 = nn.Conv2d(in_channels=inchannel,out_channels=outchannel,kernel_size=3,stride=1,padding=1)自我。Conv3x3_up_1 = nn。Conv2d (in_channels = inchannel out_channels = outchannel kernel_size = 3,跨步= 1,填充= 1)
+        self.batchnorm_up_1 = nn.BatchNorm2d(outchannel)自我。Batchnorm_up_1 = nn。BatchNorm2d (outchannel)
+        self.relu_up_1 = nn.ReLU(inplace=True)自我。relu_up_1 = nn。再次阅读(inplace = True)
+        self.conv3x3_up_2 = nn.Conv2d(in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1)自我。Conv3x3_up_2 = nn。Conv2d（in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1）
+        self.batchnorm_up_2 = nn.BatchNorm2d(outchannel)自我。Batchnorm_up_2 = nn。BatchNorm2d (outchannel)
+        self.relu_up_2 = nn.ReLU(inplace=True)自我。relu_up_2 = nn。再次阅读(inplace = True)
 
         #------------------------下面channel卷积-----------------------------------#
-        self.conv3x3_down_1 = nn.Conv2d(in_channels=inchannel, out_channels=outchannel,kernel_size=3,stride=1,padding=1)
-        self.batchnorm_down_1 = nn.BatchNorm2d(outchannel)
-        self.relu_down_1 = nn.ReLU(inplace=True)
-        self.conv3x3_down_2 = nn.Conv2d(in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1)
-        self.batchnorm_down_2 = nn.BatchNorm2d(outchannel)
-        self.relu_down_2 = nn.ReLU(inplace=True)
+        self.conv3x3_down_1 = nn.Conv2d(in_channels=inchannel, out_channels=outchannel,kernel_size=3,stride=1,padding=1)自我。Conv3x3_down_1 = nn。Conv2d (in_channels = inchannel out_channels = outchannel kernel_size = 3,跨步= 1,填充= 1)
+        self.batchnorm_down_1 = nn.BatchNorm2d(outchannel)自我。Batchnorm_down_1 = nn。BatchNorm2d (outchannel)
+        self.relu_down_1 = nn.ReLU(inplace=True)自我。relu_down_1 = nn。再次阅读(inplace = True)
+        self.conv3x3_down_2 = nn.Conv2d(in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1)自我。Conv3x3_down_2 = nn。Conv2d（in_channels=outchannel, out_channels=outchannel, kernel_size=3, stride=1,padding=1）
+        self.batchnorm_down_2 = nn.BatchNorm2d(outchannel)自我。Batchnorm_down_2 = nn。BatchNorm2d (outchannel)
+        self.relu_down_2 = nn.ReLU(inplace=True)自我。relu_down_2 = nn。再次阅读(inplace = True)
 
         #-------------------------上下channel结合卷积--------------------------------------------------#
-        self.up_down_conv3x3_1 = nn.Conv2d(in_channels=outchannel*2,out_channels=outchannel,kernel_size=3,stride=1,padding=1)
-        self.up_down_conv3x3_2 = nn.Conv2d(in_channels=outchannel,out_channels=outchannel,kernel_size=3,stride=1,padding=1)
-        self.up_down_downsample = nn.Upsample(scale_factor=2,mode="bilinear",align_corners=True)
+        self.up_down_conv3x3_1 = nn.Conv2d(in_channels=outchannel*2,out_channels=outchannel,kernel_size=3,stride=1,padding=1)自我。Up_down_conv3x3_1 = nn。Conv2d (in_channels = outchannel * 2, out_channels = outchannel kernel_size = 3,跨步= 1,填充= 1)
+        self.up_down_conv3x3_2 = nn.Conv2d(in_channels=outchannel,out_channels=outchannel,kernel_size=3,stride=1,padding=1)自我。Up_down_conv3x3_2 = nn。Conv2d (in_channels = outchannel out_channels = outchannel kernel_size = 3,跨步= 1,填充= 1)
+        self.up_down_downsample = nn.Upsample(scale_factor=2,mode="bilinear",align_corners=True)自我。Up_down_downsample = nn。Upsample (scale_factor = 2,模式=“双线性align_corners = True)
 
 
 
 
 
-    def forward(self,x,y):
-        scale_channel_left = self.scale_channel
-        spx1 = torch.split(x,split_size_or_sections=scale_channel_left,dim=1)
-        channel_left_1, channel_left_2, channel_left_3, channel_left_4 = spx1
-        spx2 = torch.split(y, split_size_or_sections=scale_channel_left, dim=1)
-        channel_right_1, channel_right_2, channel_right_3, channel_right_4 = spx2
+    def forward(self,x,y):   def向前(自我,x, y):
+        scale_channel_left = self.scale_channelscale_channel = self.scale_channel
+        spx1 = torch.split(x,split_size_or_sections=scale_channel_left,dim=1)Spx1 = torch.split（x,split_size_or_sections=scale_channel_left,dim=1）
+        channel_left_1, channel_left_2, channel_left_3, channel_left_4 = spx1Channel_left_1, channel_left_2, channel_left_3, channel_left_4 = spx1
+        spx2 = torch.split(y, split_size_or_sections=scale_channel_left, dim=1)Spx2 =火炬。Split （y, split_size_or_sections=scale_channel_left, dim=1）
+        channel_right_1, channel_right_2, channel_right_3, channel_right_4 = spx2Channel_right_1, channel_right_2, channel_right_3, channel_right_4 = spx2
 
         #-------------上面-------------------------#
-        channel_left_1 = self.relu(self.batchnorm(self.conv3x3(channel_left_1)))
-        channel_left_1 = self.relu(self.batchnorm(self.conv3x3(channel_left_1)))
+        channel_left_1 = self.relu(self.batchnorm(self.conv3x3(channel_left_1)))Channel_left_1 = self.relu(self.batchnorm(self.conv3x3(Channel_left_1))))
+        channel_left_1 = self.relu(self.batchnorm(self.conv3x3(channel_left_1)))Channel_left_1 = self.relu(self.batchnorm(self.conv3x3(Channel_left_1))))
 
-        channel_left_2 = self.relu(self.batchnorm(self.conv3x3(channel_left_2)))
-        channel_left_2 = self.relu(self.batchnorm(self.conv3x3(channel_left_2)))
+        channel_left_2 = self.relu(self.batchnorm(self.conv3x3(channel_left_2)))Channel_left_2 = self.relu(self.batchnorm(self.conv3x3(Channel_left_2))))
+        channel_left_2 = self.relu(self.batchnorm(self.conv3x3(channel_left_2)))Channel_left_2 = self.relu(self.batchnorm(self.conv3x3(Channel_left_2))))
 
-        channel_right_1 = self.relu(self.batchnorm(self.conv3x3(channel_right_1)))
-        channel_right_1 = self.relu(self.batchnorm(self.conv3x3(channel_right_1)))
+        channel_right_1 = self.relu(self.batchnorm(self.conv3x3(channel_right_1)))Channel_right_1 = self.relu(self.batchnorm(self.conv3x3(Channel_right_1))))
+        channel_right_1 = self.relu(self.batchnorm(self.conv3x3(channel_right_1)))Channel_right_1 = self.relu(self.batchnorm(self.conv3x3(Channel_right_1))))
 
-        channel_right_2 = self.relu(self.batchnorm(self.conv3x3(channel_right_2)))
-        channel_right_2 = self.relu(self.batchnorm(self.conv3x3(channel_right_2)))
+        channel_right_2 = self.relu(self.batchnorm(self.conv3x3(channel_right_2)))Channel_right_2 = self.relu(self.batchnorm(self.conv3x3(Channel_right_2))))
+        channel_right_2 = self.relu(self.batchnorm(self.conv3x3(channel_right_2)))Channel_right_2 = self.relu(self.batchnorm(self.conv3x3(Channel_right_2))))
 
         L1R1 = channel_left_1*channel_right_1
         L1R2 = channel_left_1*channel_right_2
@@ -66,26 +72,26 @@ class channelmix(nn.Module):   #将中间输出的图片，经过rcl卷积，将
         L2R2 = channel_left_2*channel_right_2
 
         #--------------------上channel融合-------------------------------#
-        UP = torch.cat((L1R1,L1R2,L2R1,L2R2),dim=1)
-        UP = self.relu_up_1(self.batchnorm_up_1(self.conv3x3_up_1(UP)))
-        UP = self.relu_up_2(self.batchnorm_up_2(self.conv3x3_up_2(UP)))
+        UP = torch.cat((L1R1,L1R2,L2R1,L2R2),dim=1)UP = torch.cat（(L1R1,L1R2,L2R1,L2R2),dim=1）
+        UP = self.relu_up_1(self.batchnorm_up_1(self.conv3x3_up_1(UP)))UP = self.relu_up_1(self.batchnorm_up_1(self.conv3x3_up_1(UP))))
+        UP = self.relu_up_2(self.batchnorm_up_2(self.conv3x3_up_2(UP)))UP = self.relu_up_2（self.batchnorm_up_2(self.conv3x3_up_2(UP))）
 
 
 
 
 
         #------------下面------------------------------#
-        channel_left_3 = self.relu(self.batchnorm(self.conv3x3(channel_left_3)))
-        channel_left_3 = self.relu(self.batchnorm(self.conv3x3(channel_left_3)))
+        channel_left_3 = self.relu(self.batchnorm(self.conv3x3(channel_left_3)))Channel_left_3 = self.relu(self.batchnorm(self.conv3x3(Channel_left_3))))
+        channel_left_3 = self.relu(self.batchnorm(self.conv3x3(channel_left_3)))Channel_left_3 = self.relu(self.batchnorm(self.conv3x3(Channel_left_3))))
 
-        channel_left_4 = self.relu(self.batchnorm(self.conv3x3(channel_left_4)))
-        channel_left_4 = self.relu(self.batchnorm(self.conv3x3(channel_left_4)))
+        channel_left_4 = self.relu(self.batchnorm(self.conv3x3(channel_left_4)))Channel_left_4 = self.relu(self.batchnorm(self.conv3x3(Channel_left_4))))
+        channel_left_4 = self.relu(self.batchnorm(self.conv3x3(channel_left_4)))Channel_left_4 = self.relu(self.batchnorm(self.conv3x3(Channel_left_4))))
 
-        channel_right_3 = self.relu(self.batchnorm(self.conv3x3(channel_right_3)))
-        channel_right_3 = self.relu(self.batchnorm(self.conv3x3(channel_right_3)))
+        channel_right_3 = self.relu(self.batchnorm(self.conv3x3(channel_right_3)))Channel_right_3 = self.relu(self.batchnorm(self.conv3x3(Channel_right_3))))
+        channel_right_3 = self.relu(self.batchnorm(self.conv3x3(channel_right_3)))Channel_right_3 = self.relu(self.batchnorm(self.conv3x3(Channel_right_3))))
 
-        channel_right_4 = self.relu(self.batchnorm(self.conv3x3(channel_right_4)))
-        channel_right_4 = self.relu(self.batchnorm(self.conv3x3(channel_right_4)))
+        channel_right_4 = self.relu(self.batchnorm(self.conv3x3(channel_right_4)))Channel_right_4 = self.relu(self.batchnorm(self.conv3x3(Channel_right_4))))
+        channel_right_4 = self.relu(self.batchnorm(self.conv3x3(channel_right_4)))Channel_right_4 = self.relu(self.batchnorm(self.conv3x3(Channel_right_4))))
 
         L3R3 = channel_left_3 * channel_right_3
         L3R4 = channel_left_3 * channel_right_4
@@ -93,9 +99,9 @@ class channelmix(nn.Module):   #将中间输出的图片，经过rcl卷积，将
         L4R4 = channel_left_4 * channel_right_4
 
         # --------------------下channel融合-------------------------------#
-        Down = torch.cat((L3R3,L3R4,L4R3,L4R4),dim=1)
-        Down = self.relu_down_1(self.batchnorm_down_1(self.conv3x3_down_1(Down)))
-        Down = self.relu_down_2(self.batchnorm_down_2(self.conv3x3_down_2(Down)))
+        Down = torch.cat((L3R3,L3R4,L4R3,L4R4),dim=1)Down = torch.cat（(L3R3,L3R4,L4R3,L4R4),dim=1）
+        Down = self.relu_down_1(self.batchnorm_down_1(self.conv3x3_down_1(Down)))Down = self.relu_down_1(self.batchnorm_down_1(self.conv3x3_down_1(Down))))
+        Down = self.relu_down_2(self.batchnorm_down_2(self.conv3x3_down_2(Down)))Down = self.relu_down_2（self.batchnorm_down_2(self.conv3x3_down_2(Down))）
 
 
         #--------------------up_down通道信息融合--------------------------------------------#
@@ -612,7 +618,7 @@ class RFLN(nn.Module):   #将模型中的3x3,csm,3x3结构变换成 1x1，csm,1x
         self.RFM = RFM(1,1)
 
         #-----------------通道融合-----------------------------------#
-        self.stage1 = channelmix(512,256)
+        self.stage1 = channelmix(512,256)自我。Stage1 = channelmix（512,256）
         self.stage2 = channelmix(256, 128)
         self.stage3 = channelmix(128, 64)
         self.stage4 = channelmix(64, 1)
@@ -624,7 +630,7 @@ class RFLN(nn.Module):   #将模型中的3x3,csm,3x3结构变换成 1x1，csm,1x
 
     def forward(self,x):
 
-        hx = x
+        hx = x   Hx = x
 
         ## -------------Encoder-------------
         hx = self.inconv(hx)
@@ -651,10 +657,10 @@ class RFLN(nn.Module):   #将模型中的3x3,csm,3x3结构变换成 1x1，csm,1x
 
         ## -------------Bridge-------------
         hx = self.relubg_1(self.bnbg_1(self.convbg_1(h6)))
-        hx = self.relubg_m(self.bnbg_m(self.convbg_m(hx)))
-        hbg = self.relubg_2(self.bnbg_2(self.convbg_2(hx))) #1,512,7,7
+        hx = self.relubg_m(self.bnbg_m(self.convbg_m(hx)))Hx = self.relubg_m（self.bnbg_m(self.convbg_m(Hx))）
+        hbg = self.relubg_2(self.bnbg_2(self.convbg_2(hx))) #1,512,7,7HBG = self.relubg_2（self.bnbg_2(self. bnbg_2)）convbg_2 (hx))) # 1512、7、7
 
-        ## -------------Decoder-------------
+        ## -------------Decoder-------------## ------------- 译码器 -------------
 
         hx = self.relu6d_1(self.bn6d_1(self.conv6d_1(torch.cat((hbg,h6),1))))
         hx = self.relu6d_m(self.bn6d_m(self.conv6d_m(hx)))
